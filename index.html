@@ -2,32 +2,25 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>色彩挑戰 - 綠色關卡</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>魔法色彩塗鴉 - 綠色關卡</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
 </head>
 <body>
-
     <div id="game-ui">
-        <h1 id="status-text">請找出一個 <span class="highlight">綠色 Green</span> 的物品！</h1>
+        [span_6](start_span)[span_7](start_span)<h1 id="instruction">請找出綠色 Green 塗滿葉子！</h1>[span_6](end_span)[span_7](end_span)
         
-        <div id="color-circle">
-            <span id="center-text">綠色<br>Green</span>
+        <div class="canvas-container">
+            <canvas id="paint-canvas"></canvas>
+            <img src="leaf-green.png" id="target-image" style="display:none;">
         </div>
 
-        <div id="hint-container">
-            <div class="hint-item">🐸 青蛙</div>
-            <div class="hint-item">🍃 葉子</div>
-            <div class="hint-item">🍇 葡萄</div>
+        <div id="color-palette">
+            <div class="color-btn red" onclick="selectColor('red')">紅色</div>
+            [span_8](start_span)<div class="color-btn green" onclick="selectColor('green')">綠色 Green</div>[span_8](end_span)
+            <div class="color-btn blue" onclick="selectColor('blue')">藍色</div>
         </div>
     </div>
-
-    <div class="video-container">
-        <video id="webcam" preload autoplay loop muted></video>
-        <canvas id="detection-canvas"></canvas>
-    </div>
-
     <script src="script.js"></script>
 </body>
 </html>
