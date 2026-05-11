@@ -3,107 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Code 顏色遊戲</title>
-    <!-- 引入 QR Code 辨識庫 -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <title>實時顏色辨識遊戲</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f0f0; margin: 0; padding: 20px; }
-        #game-container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        #preview { width: 100%; border-radius: 10px; background: #333; margin-top: 10px; }
-        #color-box { width: 150px; height: 150px; margin: 20px auto; border: 5px solid #333; border-radius: 10px; transition: 0.5s; }
-        .status { font-size: 1.2rem; font-weight: bold; margin: 10px 0; color: #555; }
-        button { padding: 10px 20px; font-size: 1rem; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        body { font-family: sans-serif; text-align: center; background: #222; color: white; margin: 0; padding: 20px; }
+        #game-container { max-width: 500px; margin: auto; }
+        canvas { width: 100%; border-radius: 15px; border: 4px solid #444; }
+        .info { font-size: 1.5rem; margin: 20px 0; }
+        #target-display { display: inline-block; width: 30px; height: 30px; vertical-align: middle; border-radius: 50%; border: 2px solid white; }
+        .hint { color: #aaa; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div id="game-container">
-    <h2>🎨 QR Code 互動著色</h2>
-    <div id="color-box"></div>
-    <div class="status" id="status">正在載入相機...</div>
-    <div class="status" id="target">目標：請找 <span id="target-color">紅色 (Red)</span></div>
+    <h2>🎯 顏色追蹤挑戰</h2>
+    <div class="info">
+        目標：找尋 <span id="target-name" style="font-weight:bold;">紅色</span> 
+        <div id="target-display" style="background: red;"></div>
+    </div>
     
-    <!-- 攝影機畫面 -->
-    <video id="video" playsinline style="display:none;"></video>
-    <canvas id="canvas" style="width: 100%; border-radius: 10px;"></canvas>
-    
-    <p><button onclick="nextLevel()" id="next-btn" style="display:none;">進入下一關</button></p>
+    <div style="position: relative;">
+        <video id="video" playsinline style="display:none;"></video>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="status" class="info" style="color: #00ff00;">請對準顏色...</div>
+    <p class="hint">將圓圈中心對準現實生活中的物品即可辨識</p>
 </div>
 
 <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const targetName = document.getElementById('target-name');
+    const targetDisplay = document.getElementById('target-display');
     const statusText = document.getElementById('status');
-    const targetText = document.getElementById('target-color');
-    const colorBox = document.getElementById('color-box');
-    const nextBtn = document.getElementById('next-btn');
 
     const levels = [
-        { name: "紅色", target: "Red", hex: "#FF0000" },
-        { name: "綠色", target: "Green", hex: "#00FF00" },
-        { name: "藍色", target: "Blue", hex: "#0000FF" }
+        { name: "紅色", r: 255, g: 0, b: 0 },
+        { name: "綠色", r: 0, g: 255, b: 0 },
+        { name: "藍色", r: 0, g: 0, b: 255 }
     ];
 
     let currentLevel = 0;
-    let isFinished = false;
+    let cooldown = false;
 
-    // 啟動攝影機
+    // 啟動相機
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
         video.srcObject = stream;
-        video.setAttribute("playsinline", true);
         video.play();
-        requestAnimationFrame(tick);
+        requestAnimationFrame(update);
     });
 
-    function tick() {
+    function update() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // 抓取畫面進行辨識
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
 
-            if (code && !isFinished) {
-                const result = code.data.trim().toLowerCase();
-                const target = levels[currentLevel].target.toLowerCase();
+            // 1. 取得中心點座標
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
 
-                if (result === target) {
-                    win();
-                } else {
-                    statusText.innerText = "偵測到：" + result + " (不對喔！)";
-                }
-            } else if (!isFinished) {
-                statusText.innerText = "請將 QR Code 對準鏡頭";
+            // 2. 取得中心點周圍 5x5 像素的平均顏色
+            const pixelData = ctx.getImageData(centerX - 2, centerY - 2, 5, 5).data;
+            let r = 0, g = 0, b = 0;
+            for (let i = 0; i < pixelData.length; i += 4) {
+                r += pixelData[i];
+                g += pixelData[i+1];
+                b += pixelData[i+2];
+            }
+            r = Math.floor(r / (pixelData.length / 4));
+            g = Math.floor(g / (pixelData.length / 4));
+            b = Math.floor(b / (pixelData.length / 4));
+
+            // 3. 畫出中心圓圈（準星）
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 5;
+            ctx.stroke();
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fill();
+
+            // 4. 辨識邏輯
+            if (!cooldown) {
+                checkColor(r, g, b);
             }
         }
-        requestAnimationFrame(tick);
+        requestAnimationFrame(update);
     }
 
-    function win() {
-        isFinished = true;
-        colorBox.style.backgroundColor = levels[currentLevel].hex;
-        statusText.innerText = "恭喜答對了！🎉";
-        nextBtn.style.display = "inline-block";
+    function checkColor(r, g, b) {
+        const target = levels[currentLevel];
         
-        // 語音播放 (瀏覽器內建)
-        const speech = new SpeechSynthesisUtterance("答對了！變成" + levels[currentLevel].name + "了！");
-        speech.lang = 'zh-TW';
-        window.speechSynthesis.speak(speech);
+        // 簡單判定：目標顏色數值是否佔據主導地位
+        let isMatch = false;
+        if (target.name === "紅色" && r > g * 1.5 && r > b * 1.5 && r > 100) isMatch = true;
+        if (target.name === "綠色" && g > r * 1.2 && g > b * 1.2 && g > 80) isMatch = true;
+        if (target.name === "藍色" && b > r * 1.5 && b > g * 1.5 && b > 80) isMatch = true;
+
+        if (isMatch) {
+            cooldown = true;
+            statusText.innerText = `✅ 成功！這是${target.name}`;
+            speak(`太棒了！你找到了${target.name}`);
+            
+            setTimeout(() => {
+                currentLevel = (currentLevel + 1) % levels.length;
+                targetName.innerText = levels[currentLevel].name;
+                targetDisplay.style.backgroundColor = `rgb(${levels[currentLevel].r},${levels[currentLevel].g},${levels[currentLevel].b})`;
+                statusText.innerText = "尋找下一個顏色...";
+                cooldown = false;
+            }, 3000);
+        }
     }
 
-    function nextLevel() {
-        currentLevel = (currentLevel + 1) % levels.length;
-        isFinished = false;
-        colorBox.style.backgroundColor = "#999";
-        targetText.innerText = levels[currentLevel].name + " (" + levels[currentLevel].target + ")";
-        nextBtn.style.display = "none";
+    function speak(text) {
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'zh-TW';
+        window.speechSynthesis.speak(msg);
     }
-
-    // 初始化背景色
-    colorBox.style.backgroundColor = "#999";
 </script>
 
 </body>
