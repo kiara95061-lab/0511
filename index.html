@@ -2,161 +2,20 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>English Color Scavenger Hunt</title>
-    <!-- 引入 AI 與 影像處理 核心庫 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
-    
-    <style>
-        /* 使用你偏好的低飽和度色彩計畫 */
-        :root {
-            --bg-color: #F4EFE5;      /* 暖米色背景 */
-            --card-bg: #FFFFFF;       /* 純白卡片 */
-            --text-main: #4A5F73;     /* 莫蘭迪深藍灰 */
-            --accent-color: #DAA520;  /* 芥末黃/金羅德色 */
-            --border-color: #E0D7C6;  /* 淺大地色邊框 */
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-
-        .container {
-            background: var(--card-bg);
-            padding: 2rem;
-            border-radius: 24px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.05);
-            text-align: center;
-            width: 90%;
-            max-width: 500px;
-            border: 1px solid var(--border-color);
-        }
-
-        h1 {
-            font-size: 1.2rem;
-            letter-spacing: 1px;
-            margin-bottom: 0.5rem;
-            opacity: 0.8;
-        }
-
-        .target-word {
-            font-size: 3.5rem;
-            font-weight: 800;
-            color: var(--accent-color);
-            margin: 1rem 0;
-            text-transform: uppercase;
-        }
-
-        #video-container {
-            width: 100%;
-            aspect-ratio: 4/3;
-            background: #eee;
-            border-radius: 16px;
-            overflow: hidden;
-            border: 4px solid var(--bg-color);
-            margin-bottom: 1rem;
-        }
-
-        .status-tag {
-            font-size: 0.8rem;
-            background: #EFEFEF;
-            padding: 4px 12px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-top: 10px;
-        }
-    </style>
+    <title>色彩挑戰 Color Challenge</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="game-container">
+        <h1 id="instruction">請找出一個綠色 green 的物品！</h1> <div id="color-circle" class="green-circle"></div> <div id="hints">
+            <p>提示：青蛙、葉子</p> </div>
 
-    <div class="container">
-        <h1>FIND SOMETHING</h1>
-        <div id="target-word" class="target-word">READY?</div>
-        
-        <div id="video-container">
-            <!-- p5.js 的視訊畫面會自動注入在這裡 -->
+        <div class="video-wrap">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="canvas-output"></canvas>
         </div>
-
-        <div id="status" class="status-tag">System Loading...</div>
     </div>
-
-    <script>
-        let classifier;
-        let video;
-        let currentIndex = 0;
-        let isReady = false;
-
-        // 定義關卡：單字與 AI 辨識標籤
-        const quests = [
-            { word: 'RED', label: 'red' },
-            { word: 'BLUE', label: 'blue' },
-            { word: 'GREEN', label: 'green' },
-            { word: 'YELLOW', label: 'yellow' }
-        ];
-
-        function setup() {
-            // 建立畫布並放入容器
-            let canvas = createCanvas(400, 300);
-            canvas.parent('video-container');
-            
-            // 啟動相機
-            video = createCapture(VIDEO);
-            video.size(400, 300);
-            video.hide();
-
-            // 載入 AI 模型 (MobileNet)
-            classifier = ml5.imageClassifier('MobileNet', video, () => {
-                document.getElementById('status').innerText = "AI Lens Active";
-                isReady = true;
-                nextQuest();
-            });
-        }
-
-        function draw() {
-            // 將相機畫面畫在畫布上
-            image(video, 0, 0, width, height);
-            
-            // 加上簡單的濾鏡感，讓畫面更柔和符合大地色系
-            fill(244, 239, 229, 30); 
-            rect(0, 0, width, height);
-        }
-
-        function nextQuest() {
-            if (currentIndex < quests.length) {
-                document.getElementById('target-word').innerText = quests[currentIndex].word;
-                classifyVideo();
-            } else {
-                document.getElementById('target-word').innerText = "CLEARED!";
-                document.getElementById('status').innerText = "Awesome Job!";
-            }
-        }
-
-        function classifyVideo() {
-            if (!isReady) return;
-            classifier.classify((error, results) => {
-                if (error) return;
-
-                let label = results[0].label.toLowerCase();
-                let target = quests[currentIndex].label;
-
-                // 如果辨識結果包含目標顏色單字
-                if (label.includes(target)) {
-                    currentIndex++;
-                    setTimeout(nextQuest, 500); // 延遲半秒進入下一關
-                } else {
-                    classifyVideo(); // 繼續辨識
-                }
-            });
-        }
-    </script>
+    
+    <script src="script.js"></script>
 </body>
 </html>
