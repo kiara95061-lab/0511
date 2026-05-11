@@ -5,104 +5,127 @@ from gtts import gTTS
 import pygame
 import os
 import time
+import threading
 
-# --- 初始化語音引擎 ---
+# --- 初始化 ---
 pygame.mixer.init()
 
-def speak(text):
-    """將文字轉為語音並播放"""
+def speak_worker(text):
+    """處理語音合成與播放的執行緒函式"""
     filename = "voice.mp3"
     try:
+        # 停止並卸載當前音樂，避免檔案被占用無法刪除
+        pygame.mixer.music.stop()
+        pygame.mixer.music.unload()
+        
         if os.path.exists(filename):
             os.remove(filename)
+            
         tts = gTTS(text=text, lang='zh-tw')
         tts.save(filename)
+        
         pygame.mixer.music.load(filename)
         pygame.mixer.music.play()
     except Exception as e:
         print(f"語音播放失敗: {e}")
 
-# --- 遊戲設定 ---
+def speak(text):
+    """使用多執行緒呼叫語音，防止 OpenCV 畫面卡頓"""
+    threading.Thread(target=speak_worker, args=(text,), daemon=True).start()
+
+# --- 遊戲關卡設定 ---
 levels = [
-    {"name": "青蛙", "color_name": "綠色", "qr_target": "Green", "bgr": (0, 255, 0), "shape": "circle"},
+    {"name": "青蛙", "color_name": "綠色", "qr_target": "Green", "bgr": (0, 200, 0), "shape": "circle"},
     {"name": "蘋果", "color_name": "紅色", "qr_target": "Red", "bgr": (0, 0, 255), "shape": "rect"},
-    {"name": "天空", "color_name": "藍色", "qr_target": "Blue", "bgr": (255, 0, 0), "shape": "rect"}
+    {"name": "天空", "color_name": "藍色", "qr_target": "Blue", "bgr": (255, 100, 0), "shape": "rect"}
 ]
 
 current_level_idx = 0
 is_colored = False
 last_speech_time = 0
+next_level_auto_time = 0
 
 def get_game_image(level, colored=False):
-    """動態生成遊戲圖片 (黑白或彩色)"""
-    img = np.ones((400, 400, 3), dtype=np.uint8) * 240  # 淺灰色背景
-    color = level["bgr"] if colored else (100, 100, 100) # 彩色或深灰色
+    """生成遊戲圖形"""
+    img = np.ones((300, 300, 3), dtype=np.uint8) * 255  # 白色畫布
+    color = level["bgr"] if colored else (180, 180, 180) # 彩色或灰色
     
     if level["shape"] == "circle":
-        cv2.circle(img, (200, 200), 120, color, -1)
-        cv2.circle(img, (200, 200), 120, (0, 0, 0), 3) # 輪廓
+        cv2.circle(img, (150, 150), 100, color, -1)
+        cv2.circle(img, (150, 150), 100, (50, 50, 50), 4) # 輪廓
     else:
-        cv2.rectangle(img, (100, 100), (300, 300), color, -1)
-        cv2.rectangle(img, (100, 100), (300, 300), (0, 0, 0), 3)
+        cv2.rectangle(img, (50, 50), (250, 250), color, -1)
+        cv2.rectangle(img, (50, 50), (250, 250), (50, 50, 50), 4)
     
     return img
 
 # --- 主程式 ---
 cap = cv2.VideoCapture(0)
 
-print("遊戲開始！按 'q' 退出，按 'n' 跳到下一關。")
+print(">>> 遊戲已啟動！")
+print(">>> 按 'n' 手動跳關, 按 'q' 結束遊戲")
 
 while True:
     ret, frame = cap.read()
     if not ret: break
-    frame = cv2.flip(frame, 1) # 鏡像畫面
     
+    frame = cv2.flip(frame, 1) # 鏡像
     level = levels[current_level_idx]
+    now = time.time()
     
-    # 每 5 秒自動提醒一次語音 (避免重複播放過於頻繁)
-    if time.time() - last_speech_time > 5 and not is_colored:
+    # 1. 語音提示 (每 7 秒提醒一次)
+    if now - last_speech_time > 7 and not is_colored:
         speak(f"請拿出{level['color_name']}的 QR Code，幫{level['name']}塗上顏色")
-        last_speech_time = time.time()
+        last_speech_time = now
 
-    # 1. 偵測 QR Code
+    # 2. QR Code 偵測
     qr_codes = decode(frame)
     for qr in qr_codes:
         data = qr.data.decode('utf-8').strip()
         (x, y, w, h) = qr.rect
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 3)
         
-        # 判定答案
         if data.lower() == level["qr_target"].lower():
             if not is_colored:
                 is_colored = True
-                speak(f"答對了！{level['name']}變成{level['color_name']}了！")
+                speak(f"太棒了！{level['name']}變成{level['color_name']}了！")
+                next_level_auto_time = now + 4 # 4秒後自動下一關
         else:
-            cv2.putText(frame, "Try Again!", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.putText(frame, "Not this one!", (x, y-15), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-    # 2. 準備遊戲畫面 (右側 UI)
+    # 3. 自動跳關邏輯
+    if is_colored and now > next_level_auto_time:
+        current_level_idx = (current_level_idx + 1) % len(levels)
+        is_colored = False
+        last_speech_time = now
+
+    # 4. 畫面合成
     game_img = get_game_image(level, colored=is_colored)
-    
-    # 3. 結合攝像頭與遊戲畫面
-    # 將遊戲圖案縮放並放在畫面中央或角落
-    h, w, _ = frame.shape
     gh, gw, _ = game_img.shape
-    frame[10:10+gh, 10:10+gw] = game_img
+    # 將遊戲畫面放在左上角，並加上邊框
+    frame[20:20+gh, 20:20+gw] = game_img
+    cv2.rectangle(frame, (20, 20), (20+gw, 20+gh), (0,0,0), 2)
+
+    # 5. 顯示 UI 文字
+    status = f"Target: {level['color_name']}"
+    cv2.putText(frame, status, (20, 360), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 4)
+    cv2.putText(frame, status, (20, 360), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 0), 2)
     
-    # 顯示文字指示
-    status_text = f"Target: {level['color_name']} {level['qr_target']}"
-    cv2.putText(frame, status_text, (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 4)
-    cv2.putText(frame, status_text, (20, 450), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 0), 2)
+    if is_colored:
+        cv2.putText(frame, "SUCCESS!", (20, 410), cv2.FONT_HERSHEY_DUPLEX, 1.2, (0, 200, 0), 3)
 
     cv2.imshow("Color QR Game", frame)
 
-    # 按鍵控制
+    # 按鍵處理
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
-    elif key == ord('n') or (is_colored and key == 32): # 按 N 或 答對後按空白鍵下一關
+    elif key == ord('n'): # 手動跳關
         current_level_idx = (current_level_idx + 1) % len(levels)
         is_colored = False
-        last_speech_time = 0
+        last_speech_time = now
 
 cap.release()
 cv2.destroyAllWindows()
+pygame.mixer.quit()
