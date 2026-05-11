@@ -2,20 +2,32 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>色彩挑戰 Color Challenge</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>色彩挑戰 - 綠色關卡</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
 </head>
 <body>
-    <div id="game-container">
-        <h1 id="instruction">請找出一個綠色 green 的物品！</h1> <div id="color-circle" class="green-circle"></div> <div id="hints">
-            <p>提示：青蛙、葉子</p> </div>
 
-        <div class="video-wrap">
-            <video id="webcam" autoplay playsinline></video>
-            <canvas id="canvas-output"></canvas>
+    <div id="game-ui">
+        <h1 id="status-text">請找出一個 <span class="highlight">綠色 Green</span> 的物品！</h1>
+        
+        <div id="color-circle">
+            <span id="center-text">綠色<br>Green</span>
+        </div>
+
+        <div id="hint-container">
+            <div class="hint-item">🐸 青蛙</div>
+            <div class="hint-item">🍃 葉子</div>
+            <div class="hint-item">🍇 葡萄</div>
         </div>
     </div>
-    
+
+    <div class="video-container">
+        <video id="webcam" preload autoplay loop muted></video>
+        <canvas id="detection-canvas"></canvas>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
